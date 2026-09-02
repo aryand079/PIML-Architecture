@@ -42,3 +42,22 @@ During a simulated severe anomaly (40% coolant loss + noisy sensors), the PIML M
 * `piml_multiagent_sim.py`: Full PIML multi-agent feedback loop simulation for the single unit.
 * `plantwide_model.py`: Plant-wide topology with tear-stream convergence and 3E metrics.
 * `multiobjective_piml_sim.py`: Complete 4-way simulation comparing Baseline, Manual Control, Standard AI, and PIML Multi-Agent recovery.
+
+## Installation & Usage
+
+**1. Install Dependencies**
+This project requires Python 3.8+ and the `pythonnet` package to bridge with DWSIM.
+`pip install -r requirements.txt`
+
+**2. DWSIM Integration (Optional)**
+The architecture is designed to interface with the DWSIM open-source chemical process simulator via the `Automation3` COM interface. If DWSIM is installed, ensure the path is set in your environment variables:
+`set DWSIM_PATH="C:\Users\Public\Documents\DWSIM"`
+
+*Note: If DWSIM is not detected, the system will automatically seamlessly fall back to an identical analytical Python engine to execute the mass and energy balances.*
+
+**3. Run the Simulations**
+To execute the single-unit CSTR anomaly response:
+`python piml_multiagent_sim.py`
+
+To execute the plant-wide 3E multi-objective simulation:
+`python multiobjective_piml_sim.py`
