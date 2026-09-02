@@ -10,11 +10,31 @@ This architecture solves this by using PINO as a universal physics constraint la
 ## System Architectures
 
 ### 1. Single-Unit Optimization (CSTR)
+```mermaid
+flowchart TB
+    A["Anomaly Detected\n(P drop + T noise)"] --> B["Process Control Agent\nPROPOSAL: T += 45 K"]
+    B --> C{"PINO Engine\nPhysics Validation"}
+    C -->|"REJECT: T=405.48 > 400 K"| D["Safety Agent\nConstraint: T <= 395 K"]
+    D --> E["Process Control Agent\nREVISED: T = 355.21 K"]
+    E --> F{"PINO Engine\nPhysics Validation"}
+    F -->|"APPROVE: Q_gen ~= Q_rem, T < 400 K"| G["Execution Agent\nPush to Plant DCS"]
+    G --> H["Plant Settles\nT = 358.99 K, X = 87.12%"]
+```
 * Models an exothermic Continuous Stirred Tank Reactor (CSTR) using a DWSIM Python.NET automation script and an analytical fallback engine.
 * Demonstrates Bayesian fusion to filter noisy temperature sensor data against physics-predicted temperatures.
 * **Result:** Recovers from a severe feed pressure drop and sensor degradation in 5.0 seconds (360x faster than standard AI), successfully preventing an emergency shutdown and retaining 25,090.6 kg/hr of production.
 
 ### 2. Plant-Wide 3E Framework (Economics × Energy × Environment)
+```mermaid
+flowchart LR
+    FF["Fresh Feed\n10 kg/s, 300 K\nPure A"] --> MIX["Mixer\nAdiabatic"]
+    MIX --> CSTR["CSTR\nA→B Exothermic\nV=1 m³, UA=5000 W/K"]
+    CSTR --> FLASH["Flash Drum\n65 kPa vacuum"]
+    FLASH -->|"Vapor (A-rich)"| SPLIT["Splitter"]
+    FLASH -->|"Liquid (B-rich)"| PROD["Product\n30,272 kg/hr B"]
+    SPLIT -->|"70% Recycle"| COND["Condenser"] --> MIX
+    SPLIT -->|"30% Purge"| PURGE["Recovery\n1,286 kg/hr"]
+```
 * Scales the PIML architecture to an interconnected topology: Fresh Feed → Mixer → CSTR → Flash Drum → Splitter → Recycle Loop.
 * Agents navigate the Pareto frontier to simultaneously optimize three objectives (3E) during a 40% loss of coolant and sensor noise.
 * **Result:** The multi-agent system securely coordinates a feed cut, flash pressure adjustment, and recycle bypass to stabilize the plant in 8 seconds. 
