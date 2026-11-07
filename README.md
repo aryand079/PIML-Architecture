@@ -1,83 +1,93 @@
-# Physics-Informed Multi-Agent Architecture for Plant Control and Optimization
+# Physics-Validated Multi-Agent Control Prototype
 
-This repository contains a quantitative proof-of-concept for an AI framework that integrates decentralized Multi-Agent systems with Physics-Informed Machine Learning (PIML). By utilizing Physics-Informed Neural Operators (PINO), the system achieves real-time, zero-shot optimization without violating thermodynamic conservation laws.
+A Python simulation prototype of a refinery-style process plant
+(Fresh Feed -> Mixer -> CSTR -> Flash Drum -> Splitter -> Recycle loop).
+Agents propose setpoint changes; a physics-based validation layer checks each
+proposal against mass balance, energy balance and safety limits before it is
+accepted.
 
-## Core Concept: The "Physics Firewall"
-Traditional deep learning controllers fail in industrial settings because they extrapolate blindly when facing unseen anomalies. This lack of physics inductive bias can cause thermal runaway or cascading failures like flash drum flooding and emergency flaring. 
+Developed as a concept for the **HMEL i-Quest 2026** competition (abstract
+submitted; not shortlisted for the next round). This is an independent student
+project and is not affiliated with or endorsed by HMEL.
 
-This architecture solves this by using PINO as a universal physics constraint layer. Before any agent-proposed setpoint change reaches the plant DCS, the PINO predicts the full plant state and checks all mass and energy conservation laws in ~5 ms. It acts as a physics firewall, ensuring only thermodynamically valid actions are executed.
+## Status: simulation prototype
 
-## System Architectures
+| Component | Status |
+|---|---|
+| Exothermic CSTR model (Arrhenius kinetics, steady-state mass and energy balance) | Implemented |
+| Flash drum (Rachford-Rice with Clausius-Clapeyron vapor pressures) | Implemented |
+| Plant-wide solver with recycle (tear-stream iteration) | Implemented |
+| Rule-based agents proposing setpoints, with physics validation of each proposal | Implemented |
+| Bayesian fusion of noisy sensor readings with the physics prediction | Implemented |
+| Neural-network surrogate (physics-informed neural operator) | **Not implemented. Planned future work.** |
+| DWSIM integration | Optional bridge; the analytical engine is used when DWSIM is absent |
 
-### 1. Single-Unit Optimization (CSTR)
-```mermaid
-flowchart TB
-    A["Anomaly Detected\n(P drop + T noise)"] --> B["Process Control Agent\nPROPOSAL: T += 45 K"]
-    B --> C{"PINO Engine\nPhysics Validation"}
-    C -->|"REJECT: T=405.48 > 400 K"| D["Safety Agent\nConstraint: T <= 395 K"]
-    D --> E["Process Control Agent\nREVISED: T = 355.21 K"]
-    E --> F{"PINO Engine\nPhysics Validation"}
-    F -->|"APPROVE: Q_gen ~= Q_rem, T < 400 K"| G["Execution Agent\nPush to Plant DCS"]
-    G --> H["Plant Settles\nT = 358.99 K, X = 87.12%"]
-```
-* Models an exothermic Continuous Stirred Tank Reactor (CSTR) using a DWSIM Python.NET automation script and an analytical fallback engine.
-* Demonstrates Bayesian fusion to filter noisy temperature sensor data against physics-predicted temperatures.
-* **Result:** Recovers from a severe feed pressure drop and sensor degradation in 5.0 seconds (360x faster than standard AI), successfully preventing an emergency shutdown and retaining 25,090.6 kg/hr of production.
+The "physics engine" that validates proposals is an **analytical solver**, not a
+trained neural operator. There is no machine-learning code in this repository.
 
-### 2. Plant-Wide 3E Framework (Economics × Energy × Environment)
+## Plant topology
+
 ```mermaid
 flowchart LR
     FF["Fresh Feed\n10 kg/s, 300 K\nPure A"] --> MIX["Mixer\nAdiabatic"]
-    MIX --> CSTR["CSTR\nA→B Exothermic\nV=1 m³, UA=5000 W/K"]
-    CSTR --> FLASH["Flash Drum\n65 kPa vacuum"]
+    MIX --> CSTR["CSTR\nA to B, exothermic\nV = 1 m3, UA = 5000 W/K"]
+    CSTR --> FLASH["Flash Drum\n65 kPa"]
     FLASH -->|"Vapor (A-rich)"| SPLIT["Splitter"]
-    FLASH -->|"Liquid (B-rich)"| PROD["Product\n30,272 kg/hr B"]
-    SPLIT -->|"70% Recycle"| COND["Condenser"] --> MIX
-    SPLIT -->|"30% Purge"| PURGE["Recovery\n1,286 kg/hr"]
+    FLASH -->|"Liquid (B-rich)"| PROD["Product"]
+    SPLIT -->|"70% Recycle"| MIX
+    SPLIT -->|"30% Purge"| PURGE["Purge"]
 ```
-* Scales the PIML architecture to an interconnected topology: Fresh Feed → Mixer → CSTR → Flash Drum → Splitter → Recycle Loop.
-* Agents navigate the Pareto frontier to simultaneously optimize three objectives (3E) during a 40% loss of coolant and sensor noise.
-* **Result:** The multi-agent system securely coordinates a feed cut, flash pressure adjustment, and recycle bypass to stabilize the plant in 8 seconds. 
-* Compared to standard AI, the PIML framework retained $41,631/hr in profit, saved 303.1 kW of cooling energy, and prevented 4,500 kg/hr of emergency flare emissions.
 
-## Quantitative Impact (Plant-Wide 3E Framework)
-During a simulated severe anomaly (40% coolant loss + noisy sensors), the PIML Multi-Agent system was benchmarked against a standard Deep Learning (DL) controller and human manual control. The PIML system successfully decoupled the conflicting multi-objective goals and prevented a cascading plant failure.
+## What the scenarios show
 
-| Metric | Baseline | Manual Control | Standard AI | **PIML 3E** |
-|--------|----------|---------------|-------------|-------------|
-| **System Outcome** | Normal | Slow Stable | CASCADING FAILURE | **Optimal 3E** |
-| **Recovery Time** | — | 900 s | 2,400 s | **8.0 s** |
-| **Profit Retained** | 100% | 62.1% | < 0% | **90.1%** |
-| **Energy Saved (vs AI)** | — | — | 0 kW (ref) | **303.1 kW** |
-| **Emergency Flare** | 0 kg/hr | 600 kg/hr | 4,500 kg/hr | **0 kg/hr** |
-| **Cascading Failures** | 0 | 0 | 3 | **0** |
+Both scenarios are steady-state calculations (no time dynamics).
 
-**Key Takeaways:**
-* **Standard AI** extrapolated blindly from the noisy sensor, starving the flash drum, overloading the compressor, and causing an emergency plant shutdown with massive flaring.
-* **Manual Control** stabilized the plant safely but slowly, suffering high economic losses and temporary flaring during the 15-minute transition.
-* **PIML Multi-Agent** utilized the PINO engine to map the Pareto frontier in milliseconds, executing a coordinated, physics-compliant recovery in 8 seconds with zero safety violations.
-  
-## Project Structure
-* `dwsim_cstr_plant.py`: DWSIM Python.NET bridge and analytical CSTR engine.
-* `piml_multiagent_sim.py`: Full PIML multi-agent feedback loop simulation for the single unit.
-* `plantwide_model.py`: Plant-wide topology with tear-stream convergence and 3E metrics.
-* `multiobjective_piml_sim.py`: Complete 4-way simulation comparing Baseline, Manual Control, Standard AI, and PIML Multi-Agent recovery.
+1. **Single unit (`piml_multiagent_sim.py`)**: feed pressure drop plus a noisy
+   temperature sensor. A proposal of 405.5 K is rejected for exceeding the
+   400 K runaway limit; a revised proposal is accepted.
+2. **Plant-wide (`multiobjective_piml_sim.py`)**: 40% loss of cooling capacity
+   (UA 5000 -> 3000 W/K). An initial proposal is rejected because flash vapor
+   exceeds the 1.5 kg/s compressor limit. Among five hand-picked candidate
+   setpoint sets, the most profitable one that passes all checks is selected,
+   holding the reactor at about 366 K (limit 400 K).
 
-## Installation & Usage
+## Limitations
 
-**1. Install Dependencies**
-This project requires Python 3.8+ and the `pythonnet` package to bridge with DWSIM.
-`pip install -r requirements.txt`
+- The "standard AI" and "manual control" cases are **scripted scenarios** for
+  illustration (fixed actions and fixed recovery times), not trained models or
+  measured benchmarks. No speed or performance comparison should be read from them.
+- Reported recovery times are simulated timestamps, not measured run times.
+- Candidate selection is a search over five hand-picked points, not a Pareto
+  optimization.
+- In `piml_multiagent_sim.py`, the approved heater setpoint is not fed back into
+  the plant model; only the coolant change is applied.
+- In `plantwide_piml_sim.py`, the CSTR energy-balance check is diagnostic only
+  and always passes; the mass-balance checks hold by construction of the solver.
+- Economic parameters (prices, penalties) and the reaction parameters are
+  illustrative values, not real plant data.
 
-**2. DWSIM Integration (Optional)**
-The architecture is designed to interface with the DWSIM open-source chemical process simulator via the `Automation3` COM interface. If DWSIM is installed, ensure the path is set in your environment variables:
-`set DWSIM_PATH="C:\Users\Public\Documents\DWSIM"`
+## Planned future work
 
-*Note: If DWSIM is not detected, the system will automatically seamlessly fall back to an identical analytical Python engine to execute the mass and energy balances.*
+- Dynamic reactor model with `scipy.integrate.solve_ivp`, so thermal runaway
+  can be simulated over time.
+- A physics-informed neural-network surrogate trained on solver data, with
+  measured accuracy, speed and unsafe-action detection rate.
+- Replace the scripted baselines with real controllers.
 
-**3. Run the Simulations**
-To execute the single-unit CSTR anomaly response:
-`python piml_multiagent_sim.py`
+## Project structure
 
-To execute the plant-wide 3E multi-objective simulation:
-`python multiobjective_piml_sim.py`
+- `src/dwsim_cstr_plant.py`: CSTR model and optional DWSIM bridge.
+- `src/piml_multiagent_sim.py`: single-unit agent and validation loop.
+- `src/plantwide_model.py`, `src/plantwide_topology.py`: plant-wide solver.
+- `src/plantwide_piml_sim.py`: plant-wide agent and validation loop.
+- `src/multiobjective_piml_sim.py`: multi-objective (economics, energy, environment) scenario.
+
+## Running
+
+```
+pip install -r requirements.txt
+python src/piml_multiagent_sim.py
+python src/multiobjective_piml_sim.py
+```
+
+DWSIM is optional. If it is not installed, the analytical engine is used automatically.
